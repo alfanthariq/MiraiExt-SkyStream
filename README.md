@@ -52,6 +52,7 @@ https://raw.githubusercontent.com/arranoust/MiraiExt-SkyStream/main/repo.json
 | **AniDB** | EN | Anime |
 | **AnimeOnsen** | EN | Anime |
 | **AnimeXin** | EN | Donghua |
+| **Animo** | EN | Anime |
 | **Anizone** | EN | Anime |
 | **Idlix** | ID | Movies & Series |
 | **LayarKaca** | ID | Movies & Series |
