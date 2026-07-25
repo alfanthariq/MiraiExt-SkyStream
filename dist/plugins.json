@@ -52,6 +52,23 @@
     "url": "https://raw.githubusercontent.com/arranoust/MiraiExt-SkyStream/main/dist/com.arranoust.animexin.sky"
   },
   {
+    "packageName": "com.arranoust.animo",
+    "name": "Animo",
+    "version": 1,
+    "baseUrl": "https://4animo.xyz",
+    "description": "Animo - Watch Anime Online Free HD with English Subtitles",
+    "authors": [
+      "arranoust"
+    ],
+    "languages": [
+      "en"
+    ],
+    "categories": [
+      "Anime"
+    ],
+    "url": "https://raw.githubusercontent.com/arranoust/MiraiExt-SkyStream/main/dist/com.arranoust.animo.sky"
+  },
+  {
     "packageName": "com.arranoust.anizone",
     "name": "AniZone",
     "version": 11,
