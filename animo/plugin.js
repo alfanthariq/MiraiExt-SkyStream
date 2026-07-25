@@ -56,8 +56,7 @@
             type: (item.type || 'TV').toLowerCase(),
             status: getStatus(item.status),
             year: item.aired && item.aired !== 'N/A' ? parseInt(item.aired) : (item.season_year || undefined),
-            score: item.score || undefined,
-            episodes: item.episodes_count || item.episodes || undefined
+            score: item.score || undefined
         });
     }
 
@@ -102,17 +101,21 @@
 
     async function getHome(cb) {
         try {
-            var homeRes = await http_get(manifest.baseUrl + '/ajax/home', AJAX_HEADERS);
-            var homeData = typeof homeRes.body === 'string' ? JSON.parse(homeRes.body) : homeRes.body;
+            var urls = [
+                manifest.baseUrl + '/ajax/home',
+                manifest.baseUrl + '/ajax/filter?status=RELEASING&page=1&limit=24',
+                manifest.baseUrl + '/ajax/filter?status=FINISHED&page=1&limit=24',
+                manifest.baseUrl + '/ajax/filter?type=MOVIE&page=1&limit=24'
+            ];
 
-            var ongoingRes = await http_get(manifest.baseUrl + '/ajax/filter?status=RELEASING&page=1&limit=24', AJAX_HEADERS);
-            var ongoingData = typeof ongoingRes.body === 'string' ? JSON.parse(ongoingRes.body) : ongoingRes.body;
+            var results = await http_parallel(urls.map(function (u) {
+                return { url: u, headers: AJAX_HEADERS };
+            }));
 
-            var completedRes = await http_get(manifest.baseUrl + '/ajax/filter?status=FINISHED&page=1&limit=24', AJAX_HEADERS);
-            var completedData = typeof completedRes.body === 'string' ? JSON.parse(completedRes.body) : completedRes.body;
-
-            var moviesRes = await http_get(manifest.baseUrl + '/ajax/filter?type=MOVIE&page=1&limit=24', AJAX_HEADERS);
-            var moviesData = typeof moviesRes.body === 'string' ? JSON.parse(moviesRes.body) : moviesRes.body;
+            var homeData = typeof results[0].body === 'string' ? JSON.parse(results[0].body) : results[0].body;
+            var ongoingData = typeof results[1].body === 'string' ? JSON.parse(results[1].body) : results[1].body;
+            var completedData = typeof results[2].body === 'string' ? JSON.parse(results[2].body) : results[2].body;
+            var moviesData = typeof results[3].body === 'string' ? JSON.parse(results[3].body) : results[3].body;
 
             var data = {};
 
