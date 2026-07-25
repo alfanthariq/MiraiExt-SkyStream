@@ -101,39 +101,21 @@
 
     async function getHome(cb) {
         try {
-            var urls = [
-                manifest.baseUrl + '/ajax/home',
-                manifest.baseUrl + '/ajax/filter?status=RELEASING&page=1&limit=24',
-                manifest.baseUrl + '/ajax/filter?status=FINISHED&page=1&limit=24',
-                manifest.baseUrl + '/ajax/filter?type=MOVIE&page=1&limit=24'
-            ];
-
-            var results = await http_parallel(urls.map(function (u) {
-                return { url: u, headers: AJAX_HEADERS };
-            }));
-
-            var homeData = typeof results[0].body === 'string' ? JSON.parse(results[0].body) : results[0].body;
-            var ongoingData = typeof results[1].body === 'string' ? JSON.parse(results[1].body) : results[1].body;
-            var completedData = typeof results[2].body === 'string' ? JSON.parse(results[2].body) : results[2].body;
-            var moviesData = typeof results[3].body === 'string' ? JSON.parse(results[3].body) : results[3].body;
+            var res = await http_get(manifest.baseUrl + '/ajax/home', AJAX_HEADERS);
+            var homeData = typeof res.body === 'string' ? JSON.parse(res.body) : res.body;
+            var d = homeData?.data;
+            if (!d) return cb({ success: false, error: 'No data found.' });
 
             var data = {};
 
-            if (homeData?.data?.mostPopular?.length) {
-                data['Popular'] = homeData.data.mostPopular.map(mapAnimeItem);
-            }
-
-            if (ongoingData?.data?.length) {
-                data['Ongoing'] = ongoingData.data.map(mapAnimeItem);
-            }
-
-            if (completedData?.data?.length) {
-                data['Completed'] = completedData.data.map(mapAnimeItem);
-            }
-
-            if (moviesData?.data?.length) {
-                data['Movies'] = moviesData.data.map(mapAnimeItem);
-            }
+            if (d.trending?.length)     data['Trending']   = d.trending.map(mapAnimeItem);
+            if (d.topAiring?.all?.length) data['Top Airing'] = d.topAiring.all.map(mapAnimeItem);
+            if (d.mostPopular?.length)  data['Popular']    = d.mostPopular.map(mapAnimeItem);
+            if (d.mostFavorite?.length) data['Favorite']   = d.mostFavorite.map(mapAnimeItem);
+            if (d.topUpcoming?.length)  data['Upcoming']   = d.topUpcoming.map(mapAnimeItem);
+            if (d.justCompleted?.length) data['Completed'] = d.justCompleted.map(mapAnimeItem);
+            if (d.latestEpisode?.length) data['Latest']    = d.latestEpisode.map(mapAnimeItem);
+            if (d.newAdded?.length)     data['New Added']  = d.newAdded.map(mapAnimeItem);
 
             if (!Object.keys(data).length) {
                 return cb({ success: false, error: 'No data found.' });
@@ -166,8 +148,7 @@
                     posterUrl: item.images?.poster || getPosterUrl(item.id),
                     type: (item.type || 'TV').toLowerCase(),
                     status: getStatus(item.status),
-                    year: item.aired && item.aired !== 'N/A' ? parseInt(item.aired) : undefined,
-                    episodes: item.episodes_count || undefined
+                    year: item.aired && item.aired !== 'N/A' ? parseInt(item.aired) : undefined
                 });
             });
 
