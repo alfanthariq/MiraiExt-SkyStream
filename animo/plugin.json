@@ -1,0 +1,16 @@
+{
+  "packageName": "com.arranoust.animo",
+  "name": "Animo",
+  "version": 1,
+  "baseUrl": "https://4animo.xyz",
+  "description": "Animo - Watch Anime Online Free HD with English Subtitles",
+  "authors": [
+    "arranoust"
+  ],
+  "languages": [
+    "en"
+  ],
+  "categories": [
+    "Anime"
+  ]
+}
