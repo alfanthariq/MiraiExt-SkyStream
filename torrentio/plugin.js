@@ -8,6 +8,10 @@
     var MEDIA_LIMIT = 20;
     var MIN_SEEDERS = 5;
 
+    var DEBRID_SERVICE_KEY = 'debrid_service';
+    var DEBRID_API_KEY_KEY = 'debrid_api_key';
+    var EXTRA_CONFIG_KEY   = 'extra_torrentio_config';
+
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
         'udp://open.stealth.si:80/announce',
@@ -126,6 +130,79 @@
     }
 
     var isAnimeProvider = manifest.baseUrl.indexOf('nyaasi') !== -1;
+
+    // ─── Plugin Settings ─────────────────────────────────────────────────────
+    async function readPreference(key) {
+        try {
+            if (typeof _dartAsyncCall === 'function') {
+                var v = await _dartAsyncCall('get_preference', { packageName: manifest.packageName, key: key });
+                if (v !== null && v !== undefined && v !== '') return v;
+            }
+        } catch (e) {}
+        try {
+            if (typeof getPreference === 'function') {
+                var v2 = await Promise.resolve(getPreference(key));
+                if (v2 !== null && v2 !== undefined && v2 !== '') return v2;
+            }
+        } catch (e) {}
+        try {
+            if (typeof _dartAsyncCall === 'function') {
+                var v3 = await _dartAsyncCall('get_storage', { key: key });
+                if (v3 !== null && v3 !== undefined && v3 !== '') return v3;
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function getSettings() {
+        return [
+            {
+                key: DEBRID_SERVICE_KEY,
+                title: 'Debrid Service',
+                description: 'Choose a debrid service. Streams become direct links instead of magnets.',
+                type: 'select',
+                defaultValue: 'none',
+                reloadOnChange: true,
+                options: [
+                    { label: 'None',              value: 'none' },
+                    { label: 'Real-Debrid',       value: 'realdebrid' },
+                    { label: 'AllDebrid',         value: 'alldebrid' },
+                    { label: 'Premiumize',        value: 'premiumize' },
+                    { label: 'DebridLink',        value: 'debridlink' },
+                    { label: 'TorBox',            value: 'torbox' },
+                    { label: 'Offcloud',          value: 'offcloud' }
+                ]
+            },
+            {
+                key: DEBRID_API_KEY_KEY,
+                title: 'Debrid API Key',
+                description: 'API key from your selected debrid service.',
+                type: 'text',
+                defaultValue: '',
+                reloadOnChange: true
+            },
+            {
+                key: EXTRA_CONFIG_KEY,
+                title: 'Extra Torrentio Config',
+                description: 'Extra config options, e.g. sort=qualitysize|qualityfilter=480p,720p (optional).',
+                type: 'text',
+                defaultValue: '',
+                reloadOnChange: true
+            }
+        ];
+    }
+
+    async function buildConfigSuffix() {
+        var parts = [];
+        var extra = await readPreference(EXTRA_CONFIG_KEY);
+        if (extra) parts.push(String(extra).trim().replace(/\|/g, '%7C'));
+        var service = await readPreference(DEBRID_SERVICE_KEY);
+        var key     = await readPreference(DEBRID_API_KEY_KEY);
+        if (service && service !== 'none' && key) {
+            parts.push(String(service).trim() + '=' + encodeURIComponent(String(key).trim()));
+        }
+        return parts.length ? '%7C' + parts.join('%7C') : '';
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // TORRENTIO
@@ -335,9 +412,10 @@
 
             if (!imdbId) return cb({ success: false, error: 'IMDB ID tidak tersedia. Torrentio membutuhkan IMDB ID untuk mencari stream.' });
 
+            var suffix = await buildConfigSuffix();
             var endpoint = isMovie
-                ? manifest.baseUrl + '/stream/movie/' + imdbId + '.json'
-                : manifest.baseUrl + '/stream/series/' + imdbId + ':' + data.season + ':' + data.episode + '.json';
+                ? manifest.baseUrl + suffix + '/stream/movie/' + imdbId + '.json'
+                : manifest.baseUrl + suffix + '/stream/series/' + imdbId + ':' + data.season + ':' + data.episode + '.json';
 
             var res = parseJSON(await http_get(endpoint, HTML_HEADERS));
             if (!res || !res.streams || !res.streams.length)
@@ -499,9 +577,10 @@
             var isMovie = data.type === 'movie';
             if (!kitsuId) return cb({ success: false, error: 'Kitsu ID tidak ditemukan. Anime ini tidak memiliki mapping ke Kitsu.' });
 
+            var suffix = await buildConfigSuffix();
             var endpoint = isMovie
-                ? manifest.baseUrl + '/stream/movie/kitsu:' + kitsuId + '.json'
-                : manifest.baseUrl + '/stream/series/kitsu:' + kitsuId + ':' + (data.episode || 1) + '.json';
+                ? manifest.baseUrl + suffix + '/stream/movie/kitsu:' + kitsuId + '.json'
+                : manifest.baseUrl + suffix + '/stream/series/kitsu:' + kitsuId + ':' + (data.episode || 1) + '.json';
 
             var res = parseJSON(await http_get(endpoint, HTML_HEADERS));
             if (!res || !res.streams || !res.streams.length)
@@ -535,5 +614,6 @@
     globalThis.search      = search;
     globalThis.load        = load;
     globalThis.loadStreams  = loadStreams;
+    globalThis.getSettings = getSettings;
 
 })();
