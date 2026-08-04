@@ -10,7 +10,10 @@
 
     var DEBRID_SERVICE_KEY = 'debrid_service';
     var DEBRID_API_KEY_KEY = 'debrid_api_key';
-    var EXTRA_CONFIG_KEY   = 'extra_torrentio_config';
+    var SORT_BY_KEY        = 'sort_by';
+    var QUALITY_FILTER_KEY = 'quality_filter';
+    var RESULT_LIMIT_KEY   = 'result_limit';
+    var DEBRID_OPTIONS_KEY = 'debrid_options';
 
     var TRACKERS = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -182,11 +185,54 @@
                 reloadOnChange: true
             },
             {
-                key: EXTRA_CONFIG_KEY,
-                title: 'Extra Torrentio Config',
-                description: 'Extra config options, e.g. sort=qualitysize|qualityfilter=480p,720p (optional).',
-                type: 'text',
-                defaultValue: '',
+                key: SORT_BY_KEY,
+                title: 'Sort By',
+                description: 'How to sort the found streams.',
+                type: 'select',
+                defaultValue: 'seeders',
+                reloadOnChange: true,
+                options: [
+                    { label: 'Seeders (default)', value: 'seeders' },
+                    { label: 'Size',              value: 'size' },
+                    { label: 'Quality + Size',    value: 'qualitysize' }
+                ]
+            },
+            {
+                key: QUALITY_FILTER_KEY,
+                title: 'Quality Filter',
+                description: 'Exclude low-quality releases from results.',
+                type: 'select',
+                defaultValue: 'none',
+                reloadOnChange: true,
+                options: [
+                    { label: 'None',                                  value: 'none' },
+                    { label: 'No Cam / SCR',                          value: 'scr,cam' },
+                    { label: 'HD Only (no 480p / Cam / SCR)',         value: '480p,scr,cam' },
+                    { label: '1080p+ (no 720p / 480p / Cam / SCR)',   value: '720p,480p,scr,cam' },
+                    { label: 'Known Releases Only',                   value: 'threed,other,scr,cam,unknown' }
+                ]
+            },
+            {
+                key: RESULT_LIMIT_KEY,
+                title: 'Results Limit',
+                description: 'Maximum number of streams shown per quality.',
+                type: 'select',
+                defaultValue: 'none',
+                reloadOnChange: true,
+                options: [
+                    { label: 'None',  value: 'none' },
+                    { label: '1',     value: '1' },
+                    { label: '2',     value: '2' },
+                    { label: '3',     value: '3' },
+                    { label: '5',     value: '5' }
+                ]
+            },
+            {
+                key: DEBRID_OPTIONS_KEY,
+                title: 'Hide "Download to Debrid" Links',
+                description: 'Only show already cached (playable) debrid links.',
+                type: 'toggle',
+                defaultValue: false,
                 reloadOnChange: true
             }
         ];
@@ -194,8 +240,15 @@
 
     async function buildConfigSuffix() {
         var parts = [];
-        var extra = await readPreference(EXTRA_CONFIG_KEY);
-        if (extra) parts.push(String(extra).trim().replace(/\|/g, '%7C'));
+        var sort = await readPreference(SORT_BY_KEY);
+        if (sort && sort !== 'none' && sort !== 'seeders') parts.push('sort=' + String(sort).trim());
+        var quality = await readPreference(QUALITY_FILTER_KEY);
+        if (quality && quality !== 'none') parts.push('qualityfilter=' + String(quality).trim());
+        var limit = await readPreference(RESULT_LIMIT_KEY);
+        if (limit && limit !== 'none') parts.push('limit=' + String(limit).trim());
+        var hideDownloads = await readPreference(DEBRID_OPTIONS_KEY);
+        var hideDownloadsOn = String(hideDownloads || '').toLowerCase();
+        if (['true', '1', 'yes', 'on'].indexOf(hideDownloadsOn) !== -1) parts.push('debridoptions=nodownloadlinks');
         var service = await readPreference(DEBRID_SERVICE_KEY);
         var key     = await readPreference(DEBRID_API_KEY_KEY);
         if (service && service !== 'none' && key) {
