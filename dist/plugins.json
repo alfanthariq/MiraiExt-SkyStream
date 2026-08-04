@@ -164,7 +164,7 @@
   {
     "packageName": "com.arranoust.torrentio",
     "name": "Torrentio",
-    "version": 5,
+    "version": 6,
     "hasSettings": true,
     "baseUrl": "https://torrentio.strem.fun",
     "description": "Torrentio - Movies, Series & Anime via Torrent",
