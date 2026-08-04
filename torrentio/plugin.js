@@ -66,6 +66,13 @@
 
     function buildStreamLabel(title, name) {
         if (!title) return name || 'Torrentio';
+        var nameParts = (name || 'Torrentio').split('\n').map(function(t) { return t.trim(); }).filter(Boolean);
+        var source    = nameParts[0] || 'Torrentio';
+        var errorTag  = (nameParts.slice(1).find(function(t) { return /error/i.test(t); }) || '').trim();
+        var isError   = errorTag || /(invalid|api ?key|token|subscription)/i.test(title);
+        if (isError) {
+            return [source, errorTag, title.replace(/\s*\n\s*/g, ' ').trim()].filter(Boolean).join(' | ');
+        }
         var tags     = (title.match(/(2160p|1080p|720p|480p|WEBRip|WEB-DL|BluRay|HDRip|DVDRip|x265|x264|XviD|DivX|10bit|HEVC|H264|HDR|DV|REMUX|PROPER)/gi) || [])
                        .map(function(t) { return t.toUpperCase(); })
                        .filter(function(t, i, a) { return a.indexOf(t) === i; })
@@ -73,7 +80,6 @@
         var seeder   = (title.match(/👤\s*(\d+)/) || [])[1];
         var size     = (title.match(/💾\s*([\d.]+ ?(?:GB|MB))/i) || [])[1];
         var provider = ((title.match(/⚙️\s*([^\n]+)/) || [])[1] || '').trim();
-        var source   = (name || 'Torrentio').split('\n')[0].trim();
         var parts    = [source];
         if (tags)     parts.push(tags);
         if (size)     parts.push('💾 ' + size);
