@@ -519,7 +519,7 @@
             new StreamResult({
               url: u,
               quality: quality,
-              source: "MovieBox" + (dubs.length ? " - " + dubName : ""),
+              source: "MovieBox" + (dubs.length ? " - " + dubName : "") + " " + (quality || 'Auto'),
               headers: {
                 Referer: BASE_URL + "/",
                 "User-Agent": UA,
