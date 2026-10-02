@@ -215,7 +215,7 @@
         }
       }
 
-      // Tahap 2 (fallback / tambahan): scrape 3 ranking, filter by title.contains
+      // Tahap 2: filter by title.contains (jalankan selalu setelah ranking/filter)
       if (!allItems.length) {
         for (var i = 0; i < RANKING_IDS.length; i++) {
           try {
@@ -232,14 +232,16 @@
             /* skip */
           }
         }
-        var q = (query || "").toLowerCase();
-        allItems = allItems.filter(function (s) {
-          return (
-            s && s.title && String(s.title).toLowerCase().indexOf(q) !== -1
-          );
-        });
-      } else {
-        // Dedup by detailPath
+      }
+      // Filter by title query (selalu jalan, terlepas source data)
+      var q = (query || "").toLowerCase();
+      allItems = allItems.filter(function (s) {
+        return (
+          s && s.title && String(s.title).toLowerCase().indexOf(q) !== -1
+        );
+      });
+      // Dedup by detailPath (setelah filter)
+      if (allItems.length) {
         var seen = {};
         allItems = allItems.filter(function (s) {
           var k = s.detailPath;
