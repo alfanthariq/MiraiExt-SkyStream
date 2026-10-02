@@ -1,0 +1,10 @@
+{
+  "packageName": "com.arranoust.moviebox",
+  "name": "Moviebox",
+  "version": 1,
+  "baseUrl": "https://officialmoviebox.com",
+  "description": "Moviebox - Nonton Film & Series Subtitle Indonesia",
+  "authors": ["alfanthariq"],
+  "languages": ["id"],
+  "categories": ["Movies", "Series"]
+}
