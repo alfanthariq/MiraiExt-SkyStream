@@ -1,6 +1,6 @@
 (function () {
   // ─── Config ───────────────────────────────────────────────────────────────
-  var BASE_URL = manifest.baseUrl; // https://themoviebox.org
+  var BASE_URL = manifest.baseUrl;
   var API_BASE = "https://h5-api.aoneroom.com";
   var UA =
     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.3";
@@ -17,6 +17,13 @@
     "User-Agent": UA,
     Accept: "application/json",
     "X-Client-Info": '{"timezone":"Asia/Jakarta"}',
+  };
+
+  // Header untuk scrape halaman SSR (halaman search meng-render kartu di server)
+  var HTML_HEADERS = {
+    "User-Agent": UA,
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
   };
 
   // ─── Bearer token cache (dari response header x-user di /home) ────────────
@@ -42,6 +49,115 @@
     } catch (_) {
       return null;
     }
+  }
+
+  function decodeEntities(s) {
+    if (!s) return "";
+    return String(s)
+      .replace(/&amp;/g, "&")
+      .replace(/&quot;/g, '"')
+      .replace(/&#0*39;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&#x27;/gi, "'")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&#(\d+);/g, function (_, n) {
+        return String.fromCharCode(parseInt(n, 10));
+      })
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // ─── Parse kartu hasil search dari HTML SSR /newWeb/searchResult ─────────
+  // SSR merender: <a href="/moviesDetail/SLUG" ...> ... <h2 class="card-title"
+  // title="TITLE"> ... <span class="rate ...">5.6</span> ... </a>
+  // Poster tidak ada di SSR (di-set client-side), diambil lewat /detail.
+  function parseSearchCards(html) {
+    if (!html || html.indexOf("/moviesDetail/") === -1) return [];
+    var out = [];
+    var seen = {};
+    var re = /<a\b[^>]*href="\/moviesDetail\/([^"'?#]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      var slug = decodeEntities(m[1]);
+      var inner = m[2] || "";
+      if (!slug || seen[slug]) continue;
+
+      var titleM = inner.match(/<h2\b[^>]*\btitle="([^"]*)"/i);
+      var title = decodeEntities(titleM ? titleM[1] : "");
+      if (!title) {
+        var textM = inner.match(/<h2\b[^>]*>([\s\S]*?)<\/h2>/i);
+        title = decodeEntities(textM ? textM[1].replace(/<[^>]+>/g, "") : "");
+      }
+      if (!title) continue;
+
+      var score = null;
+      var rateM = inner.match(/class="rate[^"]*"[^>]*>\s*([\d.]+)\s*</i);
+      if (rateM) {
+        var r = parseFloat(rateM[1]);
+        if (!isNaN(r)) score = r;
+      }
+
+      seen[slug] = true;
+      out.push({ slug: slug, title: title, score: score, poster: null, type: null, year: undefined });
+    }
+    return out;
+  }
+
+  // Parallel GET /detail untuk slug hasil search (poster + subjectType + year)
+  async function enrichSearchItems(items) {
+    if (!items.length) return items;
+    var limit = Math.min(items.length, 20);
+    var reqs = [];
+    for (var i = 0; i < limit; i++) {
+      var slug = items[i].slug;
+      reqs.push({
+        url:
+          API_BASE +
+          "/wefeed-h5api-bff/detail?detailPath=" +
+          encodeURIComponent(slug),
+        headers: buildAuthHeaders({
+          Referer: BASE_URL + "/moviesDetail/" + slug,
+        }),
+      });
+    }
+
+    var res = null;
+    if (typeof http_parallel === "function") {
+      try {
+        res = await http_parallel(
+          reqs.map(function (r) {
+            return { method: "GET", url: r.url, headers: r.headers };
+          })
+        );
+      } catch (_) {
+        res = null;
+      }
+    }
+    if (!res || !res.length) {
+      res = await Promise.all(
+        reqs.map(function (r) {
+          return http_get(r.url, r.headers).catch(function () {
+            return null;
+          });
+        })
+      );
+    }
+
+    for (var j = 0; j < limit; j++) {
+      var json = parseJSON(res[j]);
+      var subject = json && json.data && json.data.subject;
+      if (!subject) continue;
+      var cover = subject.cover && subject.cover.url;
+      if (cover) items[j].poster = String(cover);
+      if (subject.subjectType) items[j].type = toTvType(toInt(subject.subjectType));
+      var year = parseInt(String(subject.releaseDate || "").substring(0, 4), 10);
+      if (!isNaN(year)) items[j].year = year;
+      var rating = parseFloat(subject.imdbRatingValue);
+      if (!isNaN(rating) && rating > 0) items[j].score = rating;
+    }
+    return items;
   }
 
   function toInt(v) {
@@ -176,8 +292,51 @@
     }
   }
 
-  // ─── search ───────────────────────────────────────────────────────────────
+  // ─── search (scrape SSR /newWeb/searchResult) ───────────────────────────
   async function search(query, cb) {
+    try {
+      var keyword = String(query || "").trim();
+      if (!keyword) return cb({ success: false, error: "Empty query." });
+
+      var items = [];
+      try {
+        var html = getBody(
+          await http_get(
+            BASE_URL + "/newWeb/searchResult?keyword=" + encodeURIComponent(keyword),
+            HTML_HEADERS
+          )
+        );
+        items = parseSearchCards(html);
+      } catch (_) {
+        items = [];
+      }
+
+      // Fallback ke API search kalau SSR tidak mengembalikan kartu
+      if (!items.length) return cb({ success: true, data: await searchViaApi(keyword) });
+
+      await enrichSearchItems(items);
+
+      var results = [];
+      items.forEach(function (it) {
+        results.push(
+          new MultimediaItem({
+            title: it.title,
+            url: BASE_URL + "/moviesDetail/" + it.slug,
+            posterUrl: it.poster || undefined,
+            type: it.type || "movie",
+            year: it.year,
+            score: it.score,
+          })
+        );
+      });
+      cb({ success: true, data: results });
+    } catch (e) {
+      cb({ success: false, error: String(e) });
+    }
+  }
+
+  // Search via API (dipakai kalau scrape SSR gagal/kosong)
+  async function searchViaApi(query) {
     try {
       var token = await getBearerToken();
       var allItems = [];
@@ -236,9 +395,7 @@
       // Filter by title query (selalu jalan, terlepas source data)
       var q = (query || "").toLowerCase();
       allItems = allItems.filter(function (s) {
-        return (
-          s && s.title && String(s.title).toLowerCase().indexOf(q) !== -1
-        );
+        return s && s.title && String(s.title).toLowerCase().indexOf(q) !== -1;
       });
       // Dedup by detailPath (setelah filter)
       if (allItems.length) {
@@ -256,9 +413,9 @@
         var it = subjectToItem(s);
         if (it) results.push(it);
       });
-      cb({ success: true, data: results });
-    } catch (e) {
-      cb({ success: false, error: String(e) });
+      return results;
+    } catch (_) {
+      return [];
     }
   }
 
@@ -521,7 +678,11 @@
             new StreamResult({
               url: u,
               quality: quality,
-              source: "MovieBox" + (dubs.length ? " - " + dubName : "") + " " + (quality || 'Auto'),
+              source:
+                "MovieBox" +
+                (dubs.length ? " - " + dubName : "") +
+                " " +
+                (quality || "Auto"),
               headers: {
                 Referer: BASE_URL + "/",
                 "User-Agent": UA,
