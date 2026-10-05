@@ -289,18 +289,24 @@
         if (!section || !section.genreTopId) return;
         var title = section.title || "Trending";
         try {
-          var jsonSection = await apiGet(
-            "/wefeed-h5api-bff/ranking-list/content?id=" +
-              section.genreTopId +
-              "&page=1&perPage=20"
-          );
-          var list =
-            (jsonSection && jsonSection.data && jsonSection.data.subjectList) ||
-            [];
           var items = [];
-          for (var i = 0; i < list.length; i++) {
-            var it = subjectToItem(list[i]);
-            if (it) items.push(it);
+          for (var i = 0; i < 3; i++) {
+            var jsonSection = await apiGet(
+              "/wefeed-h5api-bff/ranking-list/content?id=" +
+                section.genreTopId +
+                "&page=" +
+                (i + 1) +
+                "&perPage=20"
+            );
+            var list =
+              (jsonSection &&
+                jsonSection.data &&
+                jsonSection.data.subjectList) ||
+              [];
+            for (var i = 0; i < list.length; i++) {
+              var it = subjectToItem(list[i]);
+              if (it) items.push(it);
+            }
           }
           if (items.length) data[title] = items;
         } catch (_) {
