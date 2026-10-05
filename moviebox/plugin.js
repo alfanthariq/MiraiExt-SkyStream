@@ -309,7 +309,6 @@
             }
           }
           if (items.length) data[title] = items;
-          console.log(items.length + " items for section: " + title);
         } catch (_) {
           // skip section gagal
         }
