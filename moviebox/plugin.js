@@ -317,8 +317,7 @@
       await Promise.all(tasks);
       if (!Object.keys(data).length)
         return cb({ success: false, error: "No data from API." });
-      // cb({ success: true, data: data });
-      cb({ success: true });
+      cb({ success: true, data: data });
     } catch (e) {
       cb({ success: false, error: String(e) });
     }
