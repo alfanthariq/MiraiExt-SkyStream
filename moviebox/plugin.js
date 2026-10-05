@@ -77,7 +77,8 @@
     if (!html || html.indexOf("/moviesDetail/") === -1) return [];
     var out = [];
     var seen = {};
-    var re = /<a\b[^>]*href="\/moviesDetail\/([^"'?#]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+    var re =
+      /<a\b[^>]*href="\/moviesDetail\/([^"'?#]+)"[^>]*>([\s\S]*?)<\/a>/gi;
     var m;
     while ((m = re.exec(html)) !== null) {
       var slug = decodeEntities(m[1]);
@@ -100,7 +101,14 @@
       }
 
       seen[slug] = true;
-      out.push({ slug: slug, title: title, score: score, poster: null, type: null, year: undefined });
+      out.push({
+        slug: slug,
+        title: title,
+        score: score,
+        poster: null,
+        type: null,
+        year: undefined,
+      });
     }
     return out;
   }
@@ -151,8 +159,12 @@
       if (!subject) continue;
       var cover = subject.cover && subject.cover.url;
       if (cover) items[j].poster = String(cover);
-      if (subject.subjectType) items[j].type = toTvType(toInt(subject.subjectType));
-      var year = parseInt(String(subject.releaseDate || "").substring(0, 4), 10);
+      if (subject.subjectType)
+        items[j].type = toTvType(toInt(subject.subjectType));
+      var year = parseInt(
+        String(subject.releaseDate || "").substring(0, 4),
+        10
+      );
       if (!isNaN(year)) items[j].year = year;
       var rating = parseFloat(subject.imdbRatingValue);
       if (!isNaN(rating) && rating > 0) items[j].score = rating;
@@ -267,23 +279,35 @@
   }
 
   // ─── getHome ──────────────────────────────────────────────────────────────
-  // Semua kategori dari endpoint /home (operatingList). Hanya section dengan
-  // type === 'SUBJECTS_MOVIE' yang dipakai (BANNER/FILTER/APPOINTMENT_LIST di-skip).
+  // Semua kategori dari endpoint /home (operatingList).
   async function getHome(cb) {
     try {
       var json = await apiGet("/wefeed-h5api-bff/home?host=themoviebox.org");
       var sections = (json && json.data && json.data.operatingList) || [];
       var data = {};
-      sections.forEach(function (section) {
-        if (!section || section.type !== "SUBJECTS_MOVIE") return;
+      var tasks = sections.map(async function (section) {
+        if (!section || !section.genreTopId) return;
         var title = section.title || "Trending";
-        var items = [];
-        (section.subjects || []).forEach(function (s) {
-          var it = subjectToItem(s);
-          if (it) items.push(it);
-        });
-        if (items.length) data[title] = items;
+        try {
+          var jsonSection = await apiGet(
+            "/wefeed-h5api-bff/ranking-list/content?id=" +
+              section.genreTopId +
+              "&page=1&perPage=20"
+          );
+          var list =
+            (jsonSection && jsonSection.data && jsonSection.data.subjectList) ||
+            [];
+          var items = [];
+          for (var i = 0; i < list.length; i++) {
+            var it = subjectToItem(list[i]);
+            if (it) items.push(it);
+          }
+          if (items.length) data[title] = items;
+        } catch (_) {
+          // skip section gagal
+        }
       });
+      await Promise.all(tasks);
       if (!Object.keys(data).length)
         return cb({ success: false, error: "No data from API." });
       cb({ success: true, data: data });
@@ -302,7 +326,9 @@
       try {
         var html = getBody(
           await http_get(
-            BASE_URL + "/newWeb/searchResult?keyword=" + encodeURIComponent(keyword),
+            BASE_URL +
+              "/newWeb/searchResult?keyword=" +
+              encodeURIComponent(keyword),
             HTML_HEADERS
           )
         );
@@ -312,7 +338,8 @@
       }
 
       // Fallback ke API search kalau SSR tidak mengembalikan kartu
-      if (!items.length) return cb({ success: true, data: await searchViaApi(keyword) });
+      if (!items.length)
+        return cb({ success: true, data: await searchViaApi(keyword) });
 
       await enrichSearchItems(items);
 
