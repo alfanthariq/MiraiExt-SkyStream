@@ -303,12 +303,13 @@
                 jsonSection.data &&
                 jsonSection.data.subjectList) ||
               [];
-            for (var i = 0; i < list.length; i++) {
-              var it = subjectToItem(list[i]);
+            for (var j = 0; j < list.length; j++) {
+              var it = subjectToItem(list[j]);
               if (it) items.push(it);
             }
           }
           if (items.length) data[title] = items;
+          console.log(items.length + " items for section: " + title);
         } catch (_) {
           // skip section gagal
         }
@@ -316,7 +317,8 @@
       await Promise.all(tasks);
       if (!Object.keys(data).length)
         return cb({ success: false, error: "No data from API." });
-      cb({ success: true, data: data });
+      // cb({ success: true, data: data });
+      cb({ success: true });
     } catch (e) {
       cb({ success: false, error: String(e) });
     }
