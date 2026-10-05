@@ -19,6 +19,9 @@
     "X-Client-Info": '{"timezone":"Asia/Jakarta"}',
   };
 
+  // Batas item per section (pagination /ranking-list/content)
+  var MAX_ITEMS = 100;
+
   // Header untuk scrape halaman SSR (halaman search meng-render kartu di server)
   var HTML_HEADERS = {
     "User-Agent": UA,
@@ -290,25 +293,28 @@
         var title = section.title || "Trending";
         try {
           var items = [];
-          for (var i = 0; i < 3; i++) {
+          var page = 1;
+          var hasMore = true;
+          while (hasMore) {
             var jsonSection = await apiGet(
               "/wefeed-h5api-bff/ranking-list/content?id=" +
                 section.genreTopId +
                 "&page=" +
-                (i + 1) +
+                page +
                 "&perPage=20"
             );
-            var list =
-              (jsonSection &&
-                jsonSection.data &&
-                jsonSection.data.subjectList) ||
-              [];
+            var dataSection = (jsonSection && jsonSection.data) || {};
+            var list = dataSection.subjectList || [];
             for (var j = 0; j < list.length; j++) {
               var it = subjectToItem(list[j]);
               if (it) items.push(it);
             }
+            var pager = dataSection.pager || {};
+            hasMore = pager.hasMore === true && items.length < MAX_ITEMS;
+            page = (parseInt(pager.page, 10) || page) + 1;
           }
           if (items.length) data[title] = items;
+          // console.log(items.length + " items for section: " + title);
         } catch (_) {
           // skip section gagal
         }
@@ -317,6 +323,7 @@
       if (!Object.keys(data).length)
         return cb({ success: false, error: "No data from API." });
       cb({ success: true, data: data });
+      // cb({ success: true });
     } catch (e) {
       cb({ success: false, error: String(e) });
     }
